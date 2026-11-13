@@ -99,4 +99,17 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(soybean.normalize_query('>x\n'+('A'*15)+'--'+('N'*15)), 'A'*15+'N'*15)
         with self.assertRaises(core.InputError):soybean.normalize_query('>a\n'+'A'*30+'\n>b\n'+'C'*30)
 
+    def test_powr1_query_uses_one_based_inclusive_coordinates(self):
+        ref=soybean.BY_KEY['wm82_v2'];folder=soybean.reference_dir(self.root,ref);folder.mkdir()
+        (folder/'reference.json').write_text(json.dumps({'reference':{'collection':ref.collection}}))
+        fasta=folder/ref.filename[:-3]
+        fasta.write_text('>Gm19\nGGGGGGGGGGGG\n>glyma.Wm82.gnm2.Gm20 description\nACGT\nRNTG\nCATT\n')
+        with patch.object(soybean,'POWR1_START',3),patch.object(soybean,'POWR1_END',10):
+            name,sequence=soybean.powr1_query(self.root)
+        self.assertEqual(sequence,'GTNNTGCA')
+        self.assertIn(':3-10|strand=plus|ambiguous_to_N=1',name)
+        fasta.write_text('>Gm20\nACGTACGTACGT\n>Gm20\nACGTACGTACGT\n')
+        with patch.object(soybean,'POWR1_START',3),patch.object(soybean,'POWR1_END',10):
+            with self.assertRaises(core.InputError):soybean.powr1_query(self.root)
+
 if __name__=='__main__':unittest.main()

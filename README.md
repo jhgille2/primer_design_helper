@@ -43,7 +43,7 @@ Install the following external programs for the corresponding actions. They must
   makeblastdb -in soybean_genome.fasta -dbtype nucl -out soybean_db
   ```
 
-  Enter the **database prefix** `soybean_db` or its full path in the app, not the name of a particular `.nhr`, `.nin`, or `.nsq` file. Search each parent/reference assembly that is relevant; record assembly names and versions. The app will not download genomes.
+  Enter the **database prefix** `soybean_db` or its full path in the app, not the name of a particular `.nhr`, `.nin`, or `.nsq` file. Search each parent/reference assembly that is relevant; record assembly names and versions. The Soybean library can also download and index curated genomes as described below.
 
 External executables and databases are independent installations and are not included in this repository. An unavailable executable gives an explanatory error. Long-running tools execute in a background thread.
 
@@ -99,6 +99,15 @@ Select any catalog keys shown by `--list`. For another storage location or a non
 5. For primer specificity, paste or copy a candidate pair into **Specificity**, return to the library tab, select the ready assemblies and click **Search primers in selected**. Results are individual `blastn-short` binding hits for each assembly. Review pairing, orientation, product sizes and 3′ mismatches with an appropriate in-silico PCR method; a lack of hits is not proof of uniqueness. This is not an automated genome-wide primer-pair specificity assessment.
 
 No sequence or query is uploaded by the search: after initial downloads, genomic searches and extraction run locally. The app does not yet search by gene ID, download gene annotations, look up orthology groups, or automatically transfer coordinates across assemblies. Obtain a query region and its metadata from SoyBase or your own data, and review candidate hits before alignment.
+
+### POWR1 example using actual reference assemblies
+
+1. In **Soybean library**, select **Williams 82 Wm82.gnm2** and **W05 W05.gnm1**, then click **Download and build selected**. Wm82.gnm2 is required here because the published coordinates below belong to that assembly, not Wm82.gnm6. The downloads are large.
+2. Click **Load POWR1 query**. The app reads the installed Wm82.gnm2 chromosome 20 FASTA and extracts the published POWR1 gene, Glyma.20G085100, plus 500 bp on either side: Gm20:31,774,270–31,780,304, 1-based inclusive, on the assembly's plus strand. The FASTA header records the assembly, chromosome, coordinates, strand and ambiguity conversions. The query comes from the genome; it is not a synthetic sequence. This action does not itself load W05.
+3. Click **Search locus in selected** with both assemblies selected. Check candidate hits in both references, including their query coverage, location, orientation and neighboring genes; W05 orthology is not established by a top BLAST score. Multiple rows can be separate partial alignments of the same locus. Select the Wm82 and candidate W05 rows and choose **Use selected hits for alignment**. Check that extracted regions cover the variant and adequate flanks; partial hits and repetitive sequence may complicate this. Align with MAFFT, inspect the result and identify the indel. The selected FASTA headers document the extracted intervals. Save the project to retain the sequences.
+4. A published study describes a 321 bp difference comprising a 304 bp transposable element and a 17 bp target-site duplication; another comparison reports a 318 bp W05 deletion. Variant calls and representations differ, including one analysis that did not call a W05 deletion. Do not assume the same gap size or allele in every dataset: check this actual alignment and its genomic context. Design and validate against the actual parents and relevant paralogues. See [Goettel et al.](https://pmc.ncbi.nlm.nih.gov/articles/PMC9160092/) and [Marsh et al.](https://pmc.ncbi.nlm.nih.gov/articles/PMC9033719/); the [Wm82.a2 gene coordinates](https://pmc.ncbi.nlm.nih.gov/articles/PMC9372550/) are specific to that assembly.
+
+The existing startup example remains synthetic; **Load POWR1 query** prepares a real genomic query after reference download. No pre-extracted W05 sequence or verified W05 allele is bundled. A successful local extraction/search is required to produce the comparison.
 
 
 ## A first assay

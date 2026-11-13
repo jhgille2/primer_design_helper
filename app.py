@@ -140,6 +140,7 @@ class Application(tk.Tk):
         ttk.Button(row,text='Download and build selected',command=self.setup_library,style='Action.TButton').pack(side='left')
         ttk.Button(row,text='Search locus in selected',command=self.search_library).pack(side='left',padx=6)
         ttk.Button(row,text='Search primers in selected',command=self.library_primer_search).pack(side='left')
+        ttk.Button(row,text='Load POWR1 query',command=self.load_powr1_query).pack(side='left',padx=6)
         ttk.Label(f,text='Each genome needs roughly 0.25-0.30 GB to download and several GB on disk after unpacking and indexing. Ctrl/Shift selects multiple rows. Wm82 v2/v6 are assembly versions of the same accession.',wraplength=1050).pack(anchor='w')
         ttk.Label(f,text='Locus query - one genomic sequence, 30-50,000 bases (FASTA or plain)').pack(anchor='w',pady=(5,0))
         self.textfield(f,'library_query',height=2,wrap='word')
@@ -159,6 +160,19 @@ class Application(tk.Tk):
     def choose_library(self):
         path=filedialog.askdirectory(initialdir=self.library_root.get() if Path(self.library_root.get()).exists() else None)
         if path:self.library_root.set(path);self.refresh_library()
+    def load_powr1_query(self):
+        root=Path(self.library_root.get()).expanduser();before=self.value('library_query')
+        if before.strip() and not messagebox.askyesno('Replace locus query?','Load the Wm82.gnm2 POWR1 region into the locus query field? This replaces the current query.'):return
+        def work(log):
+            log('Extracting published POWR1 region from the installed Williams 82 genome...')
+            return soybean.powr1_query(root)
+        def done(record):
+            if self.value('library_query')!=before or Path(self.library_root.get()).expanduser()!=root:
+                self.var_status.set('POWR1 extraction discarded because the query or library folder changed.');return
+            self.put('library_query',core.fasta([record]));self.library_table.selection_set(('wm82_v2','w05_v1'))
+            self.var_status.set('POWR1 query loaded. Search both assemblies and review candidate W05 hits before alignment.')
+            messagebox.showinfo('POWR1 query ready','The Wm82.gnm2 POWR1 gene and 500 bp flanks are loaded. Install and index both selected assemblies, then click Search locus in selected. Review candidate hits and genomic context before choosing W05; BLAST hits are not verified orthologues. Align the selected extracted regions and inspect the indel. The W05 allele and its indel length have not been assumed.')
+        self.library_work(work,done)
     def selected_references(self):
         selected=set(self.library_table.selection())
         refs=[ref for ref in soybean.REFERENCES if ref.key in selected]

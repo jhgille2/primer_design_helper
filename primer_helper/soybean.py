@@ -53,11 +53,52 @@ REFERENCES = (
 BY_KEY = {item.key: item for item in REFERENCES}
 DEFAULT_ROOT = Path(__file__).resolve().parent.parent / 'data' / 'soybean'
 
+# POWR1 / Glyma.20G085100 in Wm82.a2.v1 (the Wm82.gnm2 assembly).
+# Coordinates are 1-based inclusive, with 500 bases added on each side.
+POWR1_START = 31774770 - 500
+POWR1_END = 31779804 + 500
+
 def _log(callback: Callable[[str], None] | None, msg: str):
     if callback: callback(msg)
 
 def reference_dir(root: Path, ref: Reference) -> Path:
     return Path(root) / ref.key
+
+def powr1_query(root: Path):
+    """Extract the published Wm82.gnm2 locus from the installed genome FASTA.
+
+    A chromosome FASTA header must contain a Gm20 token. Refuse missing or
+    ambiguous identifiers rather than silently extracting from the wrong contig.
+    """
+    ref=BY_KEY['wm82_v2'];folder=reference_dir(root,ref)
+    try:
+        info=json.loads((folder/'reference.json').read_text(encoding='utf-8'))
+        if info.get('reference',{}).get('collection') != ref.collection:
+            raise InputError('The installed Williams 82 assembly metadata does not match Wm82.gnm2.DTC4.')
+        path=folder / ref.filename[:-3]
+        pieces=[];position=0;matches=0;collect=False;header=''
+        with path.open(encoding='ascii') as stream:
+            for line in stream:
+                if line.startswith('>'):
+                    name=line[1:].split()[0]
+                    collect=bool(re.search(r'(?:^|[._|])Gm20(?:$|[._|])',name,re.IGNORECASE))
+                    if collect:matches+=1;header=name;position=0
+                    continue
+                if not collect:continue
+                bases=''.join(line.split()).upper();next_position=position+len(bases)
+                if position < POWR1_END and next_position >= POWR1_START:
+                    pieces.append(bases[max(0,POWR1_START-1-position):min(len(bases),POWR1_END-position)])
+                position=next_position
+    except (OSError,ValueError,UnicodeError,IndexError) as exc:
+        raise InputError('Download Williams 82 Wm82.gnm2 in Soybean library before loading POWR1; its FASTA and metadata must be available.') from exc
+    if matches != 1:
+        raise InputError(f'Expected exactly one Wm82.gnm2 Gm20 chromosome in the FASTA; found {matches}. Check the assembly and FASTA headers.')
+    seq=''.join(pieces)
+    if len(seq)!=POWR1_END-POWR1_START+1 or not set(seq)<=set('ACGTNRYKMSWBDHV'):
+        raise InputError('POWR1 extraction failed: the chromosome is too short or contains invalid bases.')
+    ambiguous=sum(c not in 'ACGTN' for c in seq)
+    seq=''.join(c if c in 'ACGTN' else 'N' for c in seq)
+    return (f'Wm82.gnm2|{header}:{POWR1_START}-{POWR1_END}|strand=plus|ambiguous_to_N={ambiguous}',seq)
 
 def parse_checksum(text: str, filename: str) -> str:
     for line in text.splitlines():
