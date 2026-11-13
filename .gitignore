@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.venv/
+primer_project.json
+plate_map.csv
+blast_hits.tsv
