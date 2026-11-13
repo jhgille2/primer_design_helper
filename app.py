@@ -32,7 +32,7 @@ class Application(tk.Tk):
         bar=ttk.Frame(self,padding=(16,0));bar.pack(fill='x')
         for label,callback in [('Open project',self.open_project),('Save project',self.save_project),('Load example',self.example),('Soybean reference library',lambda:self.nb.select(self.library_tab)),('Software setup',lambda:self.nb.select(self.dependencies_tab))]:
             ttk.Button(bar,text=label,command=callback).pack(side='left',padx=(0,6))
-        ttk.Label(bar,text='Local workspace • save a project to keep your work',style='Sub.TLabel').pack(side='right')
+        ttk.Label(bar,text='Local workspace - save a project to keep your work',style='Sub.TLabel').pack(side='right')
         ttk.Label(self,textvariable=self.var_status,relief='sunken',anchor='w',padding=6).pack(fill='x',side='bottom')
         self.nb=ttk.Notebook(self);self.nb.pack(fill='both',expand=True,padx=16,pady=10)
         self.make_sequences();self.make_design();self.make_specificity();self.make_bench();self.make_plate();self.make_validation();self.make_kasp();self.make_library();self.make_dependencies()
@@ -72,7 +72,7 @@ class Application(tk.Tk):
         ttk.Label(f,text='MAFFT aligns sequences. Primer3 proposes primers. BLAST+ includes blastn, makeblastdb and blastdbcmd; all three are required for the soybean library.',wraplength=1050).pack(anchor='w',pady=8)
         ttk.Separator(f).pack(fill='x',pady=4)
         ttk.Label(f,text='Install missing software',font=('Arial',12,'bold')).pack(anchor='w',pady=(4,3))
-        ttk.Label(f,text='Linux/macOS: use an installed Conda or Mamba to install missing packages from conda-forge/Bioconda into this app’s own folder. This uses network access and disk space; it does not modify the base Conda environment.',wraplength=1050).pack(anchor='w')
+        ttk.Label(f,text='Linux/macOS: use an installed Conda or Mamba to install missing packages from conda-forge/Bioconda into this app\'s own folder. This uses network access and disk space; it does not modify the base Conda environment.',wraplength=1050).pack(anchor='w')
         row=ttk.Frame(f);row.pack(fill='x',pady=6)
         self.conda_path=tk.StringVar(value=shutil.which('conda') or shutil.which('mamba') or 'conda')
         ttk.Label(row,text='Conda or Mamba').pack(side='left');ttk.Entry(row,textvariable=self.conda_path,width=50).pack(side='left',padx=6)
@@ -108,7 +108,7 @@ class Application(tk.Tk):
         if path:self.conda_path.set(path)
     def install_dependencies(self):
         snapshots={name:var.get() for name,var in self.tool_vars().items()};manager=self.conda_path.get()
-        if not messagebox.askyesno('Install missing software?', 'Install missing MAFFT, Primer3 and BLAST+ tools using Conda/Bioconda into the app’s separate data/tools folder? This downloads software and uses local disk space.'):return
+        if not messagebox.askyesno('Install missing software?', 'Install missing MAFFT, Primer3 and BLAST+ tools using Conda/Bioconda into the app\'s separate data/tools folder? This downloads software and uses local disk space.'):return
         def work(log):
             statuses=[dependencies.probe(name,path) for name,path in snapshots.items()]
             return dependencies.install_missing(statuses,manager,dependencies.DEFAULT_PREFIX,log)
@@ -140,8 +140,8 @@ class Application(tk.Tk):
         ttk.Button(row,text='Download and build selected',command=self.setup_library,style='Action.TButton').pack(side='left')
         ttk.Button(row,text='Search locus in selected',command=self.search_library).pack(side='left',padx=6)
         ttk.Button(row,text='Search primers in selected',command=self.library_primer_search).pack(side='left')
-        ttk.Label(f,text='Each genome needs roughly 0.25–0.30 GB to download and several GB on disk after unpacking and indexing. Ctrl/Shift selects multiple rows. Wm82 v2/v6 are assembly versions of the same accession.',wraplength=1050).pack(anchor='w')
-        ttk.Label(f,text='Locus query — one genomic sequence, 30–50,000 bases (FASTA or plain)').pack(anchor='w',pady=(5,0))
+        ttk.Label(f,text='Each genome needs roughly 0.25-0.30 GB to download and several GB on disk after unpacking and indexing. Ctrl/Shift selects multiple rows. Wm82 v2/v6 are assembly versions of the same accession.',wraplength=1050).pack(anchor='w')
+        ttk.Label(f,text='Locus query - one genomic sequence, 30-50,000 bases (FASTA or plain)').pack(anchor='w',pady=(5,0))
         self.textfield(f,'library_query',height=2,wrap='word')
         row=ttk.Frame(f);row.pack(fill='x');self.library_flank=tk.StringVar(value='500')
         ttk.Label(row,text='Extra genomic flank (bp)').pack(side='left');ttk.Entry(row,textvariable=self.library_flank,width=8).pack(side='left',padx=5)
@@ -174,7 +174,7 @@ class Application(tk.Tk):
             self.library_table.item(ref.key,values=(f'G. {ref.species}',ref.accession,ref.assembly,ref.approx_mb,status))
     def library_work(self,work,finish):
         if self.library_busy:messagebox.showinfo('Soybean library','A library operation is already running.');return
-        self.library_busy=True;self.var_status.set('Working on soybean library…')
+        self.library_busy=True;self.var_status.set('Working on soybean library...')
         def progress(msg):self.after(0,lambda:self.var_status.set(msg))
         def worker():
             try:
@@ -209,7 +209,7 @@ class Application(tk.Tk):
                 for item in self.hits_table.get_children():self.hits_table.delete(item)
                 for i,h in enumerate(hits):
                     ref=soybean.BY_KEY[h.reference_key]
-                    self.hits_table.insert('','end',iid=str(i),values=(ref.assembly,h.subject,f'{h.identity:.1f}',f'{h.query_start}–{h.query_end}',f'{h.subject_start}–{h.subject_end}',h.strand,f'{h.bitscore:.1f}'))
+                    self.hits_table.insert('','end',iid=str(i),values=(ref.assembly,h.subject,f'{h.identity:.1f}',f'{h.query_start}-{h.query_end}',f'{h.subject_start}-{h.subject_end}',h.strand,f'{h.bitscore:.1f}'))
                 self.var_status.set(f'{len(hits)} candidate hits. Inspect before selecting orthologous regions.')
             self.library_work(lambda log:soybean.find_hits(root,refs,query,exe,progress=log),done)
         self.guard(start)
@@ -226,7 +226,7 @@ class Application(tk.Tk):
             def work(log):
                 results=[]
                 for i,hit in enumerate(hits, start=1):
-                    log(f'Extracting {soybean.BY_KEY[hit.reference_key].assembly} {hit.subject}…')
+                    log(f'Extracting {soybean.BY_KEY[hit.reference_key].assembly} {hit.subject}...')
                     name,seq=soybean.extract_hit(root,hit,flank,exe)
                     results.append((f'{name}|hit={i}',seq))
                 return results
@@ -245,13 +245,13 @@ class Application(tk.Tk):
             def work(log):
                 result=[]
                 for ref in refs:
-                    log(f'Searching primers in {ref.assembly}…')
+                    log(f'Searching primers in {ref.assembly}...')
                     db=soybean.database_prefix(root,ref)
                     result.append(f'# {ref.species} {ref.accession} {ref.assembly}\n'+core.blast_primers(fw,rv,str(db),exe))
                 return '\n'.join(result)
             def done(output):
                 self.put('blast_output','query\tsubject\tidentity%\tlength\tmismatches\tgaps\tqstart\tqend\tsstart\tsend\tevalue\tbitscore\tquery_seq\tsubject_seq\n'+output)
-                self.nb.select(2);self.var_status.set('Primer hits reported by reference. Inspect paired sites and 3′ mismatches.')
+                self.nb.select(2);self.var_status.set('Primer hits reported by reference. Inspect paired sites and 3-prime mismatches.')
             self.library_work(work,done)
         self.guard(start)
     def make_sequences(self):
@@ -280,20 +280,20 @@ class Application(tk.Tk):
         ttk.Label(f,text='For a SNP, a common pair alone does not genotype the variant. For KASP, use the separate KASP planning notes on the validation tab.',wraplength=1050).pack(anchor='w',pady=7)
     def make_kasp(self):
         f=self.tab('7  KASP')
-        self.header(f,'Propose allele-specific SNP primers','Select a SNP on the first tab. This experimental path proposes two forward target-binding segments with the SNP at the 3′ end and uses Primer3 for a common reverse primer. Evaluate every candidate before ordering.')
+        self.header(f,'Propose allele-specific SNP primers','Select a SNP on the first tab. This experimental path proposes two forward target-binding segments with the SNP at the 3-prime end and uses Primer3 for a common reverse primer. Evaluate every candidate before ordering.')
         row=ttk.Frame(f);row.pack(fill='x')
         self.kasp_length=tk.StringVar(value='20')
         ttk.Label(row,text='Allele-specific binding length').pack(side='left');ttk.Entry(row,textvariable=self.kasp_length,width=6).pack(side='left',padx=6)
         ttk.Button(row,text='Propose KASP candidates',command=self.run_kasp,style='Action.TButton').pack(side='left',padx=10)
         ttk.Label(f,text='Target-specific segments and common primer').pack(anchor='w',pady=(8,0));self.textfield(f,'kasp_output',height=12,wrap='word')
-        ttk.Label(f,text='Assay mix: 72× KASP assay mix with 2× KASP-TF master mix, using the vendor exact-volume example for 96-well plates.',wraplength=1060).pack(anchor='w')
+        ttk.Label(f,text='Assay mix: 72x KASP assay mix with 2x KASP-TF master mix, using the vendor exact-volume example for 96-well plates.',wraplength=1060).pack(anchor='w')
         row2=ttk.Frame(f);row2.pack(fill='x',pady=5)
         self.kasp_wells=tk.StringVar(value='96');self.kasp_overage=tk.StringVar(value='10')
         ttk.Label(row2,text='Wells').pack(side='left');ttk.Entry(row2,textvariable=self.kasp_wells,width=6).pack(side='left',padx=5)
         ttk.Label(row2,text='Overage %').pack(side='left');ttk.Entry(row2,textvariable=self.kasp_overage,width=6).pack(side='left',padx=5)
         ttk.Button(row2,text='Calculate KASP mix',command=self.kasp_mix).pack(side='left',padx=8)
         self.textfield(f,'kasp_mix_output',height=6,wrap='word')
-        ttk.Label(f,text='Not an order-ready assay. Universal 5′ tails, dye mapping, allele-specific Tm/dimer review, common-primer specificity, assay-mix formulation and wet-lab validation are required. This path does not design small-indel KASP assays.',wraplength=1060).pack(anchor='w')
+        ttk.Label(f,text='Not an order-ready assay. Universal 5-prime tails, dye mapping, allele-specific Tm/dimer review, common-primer specificity, assay-mix formulation and wet-lab validation are required. This path does not design small-indel KASP assays.',wraplength=1060).pack(anchor='w')
     def run_kasp(self):
         def start():
             records=core.parse_fasta(self.value('sequences'),aligned=True)
@@ -305,9 +305,9 @@ class Application(tk.Tk):
                 try:current=core.parse_fasta(self.value('sequences'),aligned=True)
                 except core.InputError:current=[]
                 if current!=records:self.var_status.set('KASP results discarded because sequences changed.');return
-                out=['EXPERIMENTAL SNP CANDIDATES — sequence-specific segments only; not ready to order.','First record allele '+v.ref+'; second record allele '+v.alt+'.','']
+                out=['EXPERIMENTAL SNP CANDIDATES - sequence-specific segments only; not ready to order.','First record allele '+v.ref+'; second record allele '+v.alt+'.','']
                 for item in items:
-                    out += [f"PAIR {item['rank']}",f"  Allele {v.ref} target-binding segment: 5′-{item['allele_1']}-3′",f"  Allele {v.alt} target-binding segment: 5′-{item['allele_2']}-3′",f"  Common reverse primer: 5′-{item['reverse']}-3′; Primer3 Tm {item['reverse_tm']} °C",'  Common-primer binding: '+', '.join(x['name']+(' exact' if x['match'] else ' MISMATCH/INDEL') for x in item['reverse_match']),'  Expected product lengths: '+', '.join(f'{k} {v} bp' for k,v in item['sizes'].items()),'']
+                    out += [f"PAIR {item['rank']}",f"  Allele {v.ref} target-binding segment: 5-prime-{item['allele_1']}-3-prime",f"  Allele {v.alt} target-binding segment: 5-prime-{item['allele_2']}-3-prime",f"  Common reverse primer: 5-prime-{item['reverse']}-3-prime; Primer3 Tm {item['reverse_tm']}  degC",'  Common-primer binding: '+', '.join(x['name']+(' exact' if x['match'] else ' MISMATCH/INDEL') for x in item['reverse_match']),'  Expected product lengths: '+', '.join(f'{k} {v} bp' for k,v in item['sizes'].items()),'']
                 out.append('The final base is the discriminating SNP. Check both allele-specific primer Tms, cross-dimers, local genome hits, non-focal variation, correct KASP tails and dye assignment. Tails alter synthesized primer length. Do not use without assay validation.')
                 self.put('kasp_output','\n'.join(out));self.var_status.set('KASP candidate segments generated. Genome and bench validation required.')
             self.background(lambda:list(core.kasp_candidates(records,v,length,minimum,maximum,count,exe)),done)
@@ -318,7 +318,7 @@ class Application(tk.Tk):
             wells=int(self.kasp_wells.get());over=float(self.kasp_overage.get())
             if wells<=0 or over<0:raise core.InputError('Use positive wells and nonnegative overage.')
             n=math.ceil(wells*(1+over/100))
-            self.put('kasp_mix_output',f'For {wells} wells prepare {n} equivalents:\n2× KASP-TF master mix: {5*n:.2f} µL\n72× assay mix: {0.14*n:.2f} µL\nMix and dispense 5.14 µL per well; add 4.86 µL DNA or NTC water separately for 10 µL total.\nFollow the assay sheet and instrument-specific requirements.')
+            self.put('kasp_mix_output',f'For {wells} wells prepare {n} equivalents:\n2x KASP-TF master mix: {5*n:.2f} uL\n72x assay mix: {0.14*n:.2f} uL\nMix and dispense 5.14 uL per well; add 4.86 uL DNA or NTC water separately for 10 uL total.\nFollow the assay sheet and instrument-specific requirements.')
         self.guard(run)
     def make_specificity(self):
         f=self.tab('3  Specificity')
@@ -327,16 +327,16 @@ class Application(tk.Tk):
         self.blastpath=tk.StringVar(value='blastn');self.dbpath=tk.StringVar()
         ttk.Label(row,text='blastn').pack(side='left');ttk.Entry(row,textvariable=self.blastpath,width=18).pack(side='left',padx=5)
         ttk.Label(row,text='Database prefix').pack(side='left',padx=(12,2));ttk.Entry(row,textvariable=self.dbpath,width=55).pack(side='left',padx=4,fill='x',expand=True)
-        ttk.Label(f,text='Primer sequences, both written 5′ to 3′; one line per primer').pack(anchor='w',pady=(8,0));self.textfield(f,'primers',height=2)
+        ttk.Label(f,text='Primer sequences, both written 5-prime to 3-prime; one line per primer').pack(anchor='w',pady=(8,0));self.textfield(f,'primers',height=2)
         row=ttk.Frame(f);row.pack(fill='x');ttk.Button(row,text='Search local database',command=self.run_blast,style='Action.TButton').pack(side='left')
         ttk.Button(row,text='Export hit table',command=lambda:self.export_text('blast_output','blast_hits.tsv')).pack(side='left',padx=7)
         ttk.Label(f,text='BLAST hits (tab separated)').pack(anchor='w',pady=(8,0));self.textfield(f,'blast_output',height=16)
-        ttk.Label(f,text='Results depend on database completeness and search settings. Short-primer BLAST can miss sites; examine 3′ mismatches and paired products, and verify experimentally. Consider both parental assemblies and paralogues.',wraplength=1050).pack(anchor='w')
+        ttk.Label(f,text='Results depend on database completeness and search settings. Short-primer BLAST can miss sites; examine 3-prime mismatches and paired products, and verify experimentally. Consider both parental assemblies and paralogues.',wraplength=1050).pack(anchor='w')
     def make_bench(self):
         f=self.tab('4  Mix');self.header(f,'Primer stocks and reaction master mix','Use the actual oligo yield and reagent concentrations. These calculations do not choose polymerase conditions for you.')
         grid=ttk.Frame(f);grid.pack(fill='x')
         self.calcvars={}
-        values=[('oligo_nmol','Delivered oligo (nmol)','9'),('stock_um','Resuspension target (µM)','100'),('work_um','Working concentration (µM)','10'),('work_vol','Working volume (µL)','100'),('total','Reaction volume (µL)','25'),('strength','Master mix strength (×)','2'),('fstock','Forward primer stock (µM)','10'),('rstock','Reverse primer stock (µM)','10'),('final','Final each primer (µM)','0.2'),('template','DNA per well (µL)','2'),('wells','Number of wells','96'),('overage','Overage (%)','10')]
+        values=[('oligo_nmol','Delivered oligo (nmol)','9'),('stock_um','Resuspension target (uM)','100'),('work_um','Working concentration (uM)','10'),('work_vol','Working volume (uL)','100'),('total','Reaction volume (uL)','25'),('strength','Master mix strength (x)','2'),('fstock','Forward primer stock (uM)','10'),('rstock','Reverse primer stock (uM)','10'),('final','Final each primer (uM)','0.2'),('template','DNA per well (uL)','2'),('wells','Number of wells','96'),('overage','Overage (%)','10')]
         for i,(key,label,val) in enumerate(values):
             row=i//3;col=(i%3)*2
             ttk.Label(grid,text=label).grid(row=row,column=col,sticky='w',padx=(4,6),pady=5)
@@ -345,7 +345,7 @@ class Application(tk.Tk):
         self.textfield(f,'mix_output',height=12,wrap='word')
         ttk.Label(f,text='This calculator is for a conventional two-primer reaction. KASP assay mixes have different chemistry and ratios; use the KASP instructions in the validation tab.',wraplength=1050).pack(anchor='w')
     def make_plate(self):
-        f=self.tab('5  Plate');self.header(f,'Prepare a 96-well sample map','Enter one unique well label per line, in loading order. Wells fill down columns: A1, B1 … H1, A2. Explicitly include parents, true heterozygote when available, extraction blank and at least two NTCs.')
+        f=self.tab('5  Plate');self.header(f,'Prepare a 96-well sample map','Enter one unique well label per line, in loading order. Wells fill down columns: A1, B1 ... H1, A2. Explicitly include parents, true heterozygote when available, extraction blank and at least two NTCs.')
         ttk.Label(f,text='Sample and control labels').pack(anchor='w');self.textfield(f,'samples',height=10)
         row=ttk.Frame(f);row.pack(fill='x');ttk.Button(row,text='Preview plate',command=self.make_plate_map).pack(side='left');ttk.Button(row,text='Export CSV',command=self.export_plate).pack(side='left',padx=6)
         self.textfield(f,'plate_output',height=10)
@@ -364,7 +364,7 @@ class Application(tk.Tk):
         try: fn()
         except (core.InputError,ValueError,IndexError,KeyError,OSError) as e:messagebox.showerror('Check input',str(e));self.var_status.set('Check input and try again.')
     def background(self,func,done):
-        self.var_status.set('Running external program…')
+        self.var_status.set('Running external program...')
         def worker():
             try:
                 result=func();self.after(0,lambda:done(result))
@@ -402,7 +402,7 @@ class Application(tk.Tk):
                     if not unchanged:self.var_status.set('Primer results discarded because sequences changed.');return
                 self.designs=result;out=[]
                 for d in result:
-                    out.append(f"PAIR {d['rank']}\n  Forward 5′–3′: {d['forward']}   Tm {d['forward_tm']} °C\n  Reverse 5′–3′: {d['reverse']}   Tm {d['reverse_tm']} °C\n  Reference positions: {d['ref_left_1based']} to {d['ref_right_1based']}\n  Predicted lengths: "+', '.join(f'{k} {v} bp' for k,v in d['sizes'].items()))
+                    out.append(f"PAIR {d['rank']}\n  Forward 5-prime-3-prime: {d['forward']}   Tm {d['forward_tm']}  degC\n  Reverse 5-prime-3-prime: {d['reverse']}   Tm {d['reverse_tm']}  degC\n  Reference positions: {d['ref_left_1based']} to {d['ref_right_1based']}\n  Predicted lengths: "+', '.join(f'{k} {v} bp' for k,v in d['sizes'].items()))
                     for typ,key in [('Forward','forward_match'),('Reverse','reverse_match')]:
                         out.append('  '+typ+' binding: '+', '.join(x['name']+(' exact' if x['match'] else ' MISMATCH/INDEL') for x in d[key]))
                     out.append('')
@@ -431,8 +431,8 @@ class Application(tk.Tk):
             vol,stockvol,water=core.oligo_resuspension(nmol,stock,stock,v['work_um'],v['work_vol'])
             if not v['wells'].is_integer():raise core.InputError('Well count must be an integer.')
             n,parts=core.reaction_mix(v['total'],v['strength'],v['fstock'],v['rstock'],v['final'],v['template'],int(v['wells']),v['overage'])
-            text=f"OLIGO\nAdd {vol:.2f} µL buffer to {nmol:g} nmol for {stock:g} µM stock.\nFor {v['work_vol']:g} µL working solution: {stockvol:.2f} µL stock + {water:.2f} µL water.\n\nMASTER MIX — {int(v['wells'])} wells; prepare {n} equivalents\n"
-            for name,x in parts:text+=f'{name:32} {x:8.3f} µL per well   {x*n:9.2f} µL for {n} equivalents'+(' (add separately)' if name.startswith('Template') else '')+'\n'
+            text=f"OLIGO\nAdd {vol:.2f} uL buffer to {nmol:g} nmol for {stock:g} uM stock.\nFor {v['work_vol']:g} uL working solution: {stockvol:.2f} uL stock + {water:.2f} uL water.\n\nMASTER MIX - {int(v['wells'])} wells; prepare {n} equivalents\n"
+            for name,x in parts:text+=f'{name:32} {x:8.3f} uL per well   {x*n:9.2f} uL for {n} equivalents'+(' (add separately)' if name.startswith('Template') else '')+'\n'
             text+='\nDispense shared components together, then add DNA separately; use water in no-template wells.'
             self.put('mix_output',text)
         self.guard(run)
@@ -440,7 +440,7 @@ class Application(tk.Tk):
         def run():
             data=core.plate_csv(self.value('samples'));rows=list(csv.DictReader(io.StringIO(data)));mapping={r['well']:r['sample_or_control'] for r in rows}
             lines=['       '+''.join(f'{i:<17}' for i in range(1,13))]
-            for r in 'ABCDEFGH': lines.append(f'{r:<7}'+''.join(f'{mapping.get(r+str(c),"—")[:15]:<17}' for c in range(1,13)))
+            for r in 'ABCDEFGH': lines.append(f'{r:<7}'+''.join(f'{mapping.get(r+str(c),"-")[:15]:<17}' for c in range(1,13)))
             self.put('plate_output','\n'.join(lines));self.var_status.set(f'{len(rows)} wells mapped. Confirm controls before export.')
         self.guard(run)
     def export_plate(self):
@@ -455,7 +455,7 @@ class Application(tk.Tk):
         path=filedialog.asksaveasfilename(defaultextension='.json',initialfile='primer_project.json',filetypes=[('Project JSON','*.json')])
         if not path:return
         data={'format':'primer-design-helper','version':1,'fields':{k:self.value(k) for k in self.fields},'settings':{'mafft':self.mafft.get(),'primer3':self.p3path.get(),'blastn':self.blastpath.get(),'db':self.dbpath.get(),'min':self.minlen.get(),'max':self.maxlen.get(),'pairs':self.npairs.get(),'conda_path':self.conda_path.get(),'library_root':self.library_root.get(),'makeblastdb':self.makeblastdb_path.get(),'blastdbcmd':self.blastdbcmd_path.get(),'calc':{k:v.get() for k,v in self.calcvars.items()}}}
-        try:Path(path).write_text(json.dumps(data,indent=2),encoding='utf-8');self.var_status.set('Project saved locally.')
+        try:Path(path).write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding='utf-8');self.var_status.set('Project saved locally.')
         except OSError as e:messagebox.showerror('Save project',str(e))
     def open_project(self):
         path=filedialog.askopenfilename(filetypes=[('Project JSON','*.json')]);
@@ -481,7 +481,7 @@ class Application(tk.Tk):
         self.put('notes','Example data are synthetic and are not orderable or biologically validated.\n\nRecord assembly/version, coordinate, strand, parent identities, variant evidence, homology checks, primer sequences and conditions, controls, instrument, trace/gel locations, and call decisions.\n')
         self.invalidate_sequences();self.find_variants();self.calculate();self.make_plate_map();self.var_status.set('Synthetic example loaded. Replace it with your own sequences.')
     def insert_guidance(self):
-        text='''\n\nKASP AND HRM CHECKLIST\n• KASP: use two allele-specific primers and one common primer, compatible universal tails, assay mix, master mix and assay-specific dye mapping. Use vendor-specific design and instructions; common Primer3 pairs are not a complete KASP assay. Screen binding sites against both parents and paralogues.\n• For KASP use controls for both homozygotes and a sequence-verified heterozygote where possible, plus extraction blank and at least two NTCs. Interpret FAM/HEX clusters against controls. Do not force ambiguous clusters.\n• Indel gel: compare predicted parental fragment sizes with ladder resolution and validate heterozygotes. Additional polymorphisms can change size.\n• HRM: use appropriate dye, instrument, calibration and analysis; compare replicates of verified parental homozygotes and heterozygotes. Other variants can alter melt profiles; confirm representative groups by sequencing.\n• Document sequence-confirmed controls, repeats, concordance, missingness, allele dropout and off-target evidence before production use.\n\nSources: https://www.biosearchtech.com/how-does-kasp-work ; https://primer3.org/manual.html ; https://www.ncbi.nlm.nih.gov/tools/primer-blast/ ; https://pmc.ncbi.nlm.nih.gov/articles/PMC6198901/\n'''
+        text='''\n\nKASP AND HRM CHECKLIST\n- KASP: use two allele-specific primers and one common primer, compatible universal tails, assay mix, master mix and assay-specific dye mapping. Use vendor-specific design and instructions; common Primer3 pairs are not a complete KASP assay. Screen binding sites against both parents and paralogues.\n- For KASP use controls for both homozygotes and a sequence-verified heterozygote where possible, plus extraction blank and at least two NTCs. Interpret FAM/HEX clusters against controls. Do not force ambiguous clusters.\n- Indel gel: compare predicted parental fragment sizes with ladder resolution and validate heterozygotes. Additional polymorphisms can change size.\n- HRM: use appropriate dye, instrument, calibration and analysis; compare replicates of verified parental homozygotes and heterozygotes. Other variants can alter melt profiles; confirm representative groups by sequencing.\n- Document sequence-confirmed controls, repeats, concordance, missingness, allele dropout and off-target evidence before production use.\n\nSources: https://www.biosearchtech.com/how-does-kasp-work ; https://primer3.org/manual.html ; https://www.ncbi.nlm.nih.gov/tools/primer-blast/ ; https://pmc.ncbi.nlm.nih.gov/articles/PMC6198901/\n'''
         self.fields['notes'].insert('end',text)
 
 if __name__=='__main__':

@@ -76,7 +76,7 @@ def install_missing(statuses: list[ToolStatus], conda: str, prefix: Path, progre
     exists=(prefix/'conda-meta'/'history').is_file()
     if prefix.exists() and not exists:raise InputError(f'The target {prefix} exists but is not a valid Conda environment; choose a different location or move it aside.')
     cmd=[manager,'install' if exists else 'create','--yes','--prefix',str(prefix),'--override-channels','--channel','conda-forge','--channel','bioconda','--strict-channel-priority',*packages]
-    if progress:progress('Installing '+', '.join(packages)+' into the app environment. This can take several minutes…')
+    if progress:progress('Installing '+', '.join(packages)+' into the app environment. This can take several minutes...')
     try:result=subprocess.run(cmd,text=True,capture_output=True,timeout=3600,check=False)
     except (OSError,subprocess.TimeoutExpired) as exc:raise InputError(f'Conda installation could not finish: {exc}') from exc
     if result.returncode:raise InputError('Conda installation failed. '+(result.stderr or result.stdout)[-3000:])

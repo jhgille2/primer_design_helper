@@ -212,7 +212,7 @@ def normalize_query(text: str) -> str:
         raw=''.join(lines[1:])
     seq=''.join(raw.split()).upper().replace('-','')
     if len(seq)<30 or len(seq)>50000 or not set(seq)<=set('ACGTN'):
-        raise InputError('Query must contain 30–50,000 A/C/G/T/N bases (FASTA or plain sequence).')
+        raise InputError('Query must contain 30-50,000 A/C/G/T/N bases (FASTA or plain sequence).')
     return seq
 
 def find_hits(root: Path, refs: list[Reference], query: str, executable='blastn', max_hits=30, progress=None):
@@ -221,7 +221,7 @@ def find_hits(root: Path, refs: list[Reference], query: str, executable='blastn'
     if not 1<=max_hits<=1000:raise InputError('Maximum hits must be between 1 and 1000.')
     hits=[]
     for ref in refs:
-        db=database_prefix(root,ref);_log(progress,f'Searching {ref.accession} {ref.assembly}…')
+        db=database_prefix(root,ref);_log(progress,f'Searching {ref.accession} {ref.assembly}...')
         output=_run([executable,'-task','megablast','-query','-','-db',str(db),'-max_target_seqs',str(max_hits),'-max_hsps','3',
                      '-outfmt','6 sseqid pident length qstart qend sstart send slen evalue bitscore'],input_text=f'>query\n{seq}\n',timeout=3600)
         for line in output.splitlines():

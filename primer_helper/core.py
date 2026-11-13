@@ -91,7 +91,7 @@ class Variant:
     kind: str
     @property
     def label(self):
-        return f'alignment {self.start + 1}–{self.end} | ref offset {self.ref_start} (0-based) | {self.kind} | {self.ref or "−"} → {self.alt or "−"}'
+        return f'alignment {self.start + 1}-{self.end} | ref offset {self.ref_start} (0-based) | {self.kind} | {self.ref or "-"} -> {self.alt or "-"}'
 
 def variants(ref: str, alt: str) -> list[Variant]:
     if len(ref) != len(alt):
@@ -124,7 +124,7 @@ def revcomp(seq: str) -> str:
 def primer3_input(ref_aligned: str, variant: Variant, minimum: int, maximum: int, count: int) -> str:
     ref = ref_aligned.replace('-', '')
     if minimum < 40 or maximum < minimum or maximum > 10000 or not 1 <= count <= 50:
-        raise InputError('Use a product range of 40–10,000 bp and 1–50 pairs.')
+        raise InputError('Use a product range of 40-10,000 bp and 1-50 pairs.')
     if len(ref) < minimum:
         raise InputError('Reference sequence is shorter than the minimum product size.')
     # A reference-gap insertion has no reference base: target one flanking base, if available.
@@ -210,7 +210,7 @@ def kasp_candidates(records, v: Variant, primer_length: int, minimum: int, maxim
     if v.kind != 'SNP' or len(v.ref) != 1 or len(v.alt) != 1 or v.ref not in 'ACGT' or v.alt not in 'ACGT':
         raise InputError('This initial KASP path supports a single A/C/G/T SNP only; small indels require specialized assay design.')
     if not 18 <= primer_length <= 25:
-        raise InputError('Allele-specific binding length must be 18–25 bases.')
+        raise InputError('Allele-specific binding length must be 18-25 bases.')
     ref=records[0][1].replace('-', '')
     start=v.ref_start-primer_length+1
     if start < 0:
@@ -241,7 +241,7 @@ def blast_primers(forward: str, reverse: str, db: str, executable='blastn', max_
 
 def reaction_mix(total: float, master_factor: float, fstock: float, rstock: float, final: float, template: float, wells: int, overage: float):
     if min(total,master_factor,fstock,rstock,final,wells) <= 0 or template < 0 or overage < 0 or master_factor <= 1:
-        raise InputError('Enter positive volumes and concentrations, nonnegative overage, and a master mix stronger than 1×.')
+        raise InputError('Enter positive volumes and concentrations, nonnegative overage, and a master mix stronger than 1x.')
     n = math.ceil(wells*(1+overage/100))
     master = total/master_factor
     fw = final*total/fstock
@@ -249,7 +249,7 @@ def reaction_mix(total: float, master_factor: float, fstock: float, rstock: floa
     water = total-master-fw-rv-template
     if water < -1e-9:
         raise InputError('The component volumes exceed the total reaction volume.')
-    return n, [('2× or specified master mix',master),('Forward primer',fw),('Reverse primer',rv),('Water',max(0.0,water)),('Template added separately',template)]
+    return n, [('2x or specified master mix',master),('Forward primer',fw),('Reverse primer',rv),('Water',max(0.0,water)),('Template added separately',template)]
 
 def oligo_resuspension(nmol: float, target_um: float, stock_um: float, work_um: float, work_volume_ul: float):
     if min(nmol,target_um,stock_um,work_um,work_volume_ul)<=0 or work_um>stock_um:
