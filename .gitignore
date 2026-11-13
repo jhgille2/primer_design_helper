@@ -4,3 +4,7 @@ __pycache__/
 primer_project.json
 plate_map.csv
 blast_hits.tsv
+
+# Downloaded public reference genomes and indexes (large and reproducible)
+data/soybean/
+data/tools/

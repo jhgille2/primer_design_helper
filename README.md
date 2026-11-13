@@ -6,7 +6,7 @@ A local desktop application for developing PCR genotyping assays from candidate 
 
 ## What it does
 
-1. Accepts two or more genomic FASTA sequences, calls locally installed MAFFT for alignment or accepts aligned FASTA, and finds differences between the first and second records. Additional records participate in primer-binding checks. The supplied example is synthetic.
+1. Downloads and indexes selected public soybean reference genomes, helps review candidate homologous regions, and accepts two or more genomic FASTA sequences, calls locally installed MAFFT for alignment or accepts aligned FASTA, and finds differences between the first and second records. Additional records participate in primer-binding checks. The supplied example is synthetic.
 2. Runs local `primer3_core` to propose flanking primer pairs around a selected SNP or indel. It reports calculated primer Tms from Primer3, product sizes within the supplied alignments, and whether each primer binding site matches each provided sequence.
 3. For a single SNP, proposes two allele-specific forward **binding segments** with the polymorphism at the 3′ end and a common reverse primer selected by Primer3. This is an experimental, plus-strand path. It does not design a complete order-ready KASP assay, automatically calculate the second primer's Tm, select universal tails or design small-indel KASP assays. Different allele-specific binding-site variation is rejected; consider the opposite orientation or specialist design.
 4. Runs `blastn -task blastn-short` against a user-supplied local nucleotide database and exports individual primer hits. This is an aid to manual analysis: it does **not** pair hits, predict all off-target amplicons, prove the intended hit is orthologous or establish genome-wide specificity. BLAST can miss short primer matches and reports only the configured maximum of 1,000 target sequences.
@@ -47,6 +47,60 @@ Install the following external programs for the corresponding actions. They must
 
 External executables and databases are independent installations and are not included in this repository. An unavailable executable gives an explanatory error. Long-running tools execute in a background thread.
 
+## Detect and install software in the app
+
+Open **Software setup** (or the **Software** tab). The app checks `mafft`, `primer3_core`, `blastn`, `makeblastdb`, and `blastdbcmd` on startup; click **Check software** to check again. Select a row and use **Browse for selected executable** if a program is installed but not on your PATH. BLAST+ supplies the last three executables. The check runs each program; Primer3 is checked using a small Boulder-IO request. A successful response does not validate a specific analysis.
+
+On **Linux and macOS**, if Conda or Mamba is already installed, select **Install missing tools**. The app installs missing Bioconda/conda-forge packages into `data/tools/bioinformatics`, a dedicated environment under the repository. It does not change the base environment. It then checks the resulting executables and fills their app paths; subsequent launches discover that managed environment. Internet access, free disk space, package availability for your architecture, and a working Conda/Mamba installation are required. If Conda is not on PATH, enter or browse to its executable; the app links to the official Miniforge instructions. The managed tool directory is excluded from Git. If the target directory already exists but is not a valid Conda environment, the app refuses to overwrite it.
+
+**Native Windows:** Bioconda does not publish Windows packages. Automatic Bioconda installation is therefore unavailable in a native Windows session. The same tab links to the official MAFFT, Primer3 and NCBI BLAST+ downloads; follow each project's Windows instructions and browse to the executables after installation. Alternatively, run the *entire application*, Python, and dependencies inside Linux/WSL with a working graphical display. An executable in WSL is not automatically usable by native Windows Python. The app does not install WSL or Conda for you. Some tools/platform combinations may require manual installation; availability varies.
+
+## Download a soybean reference library
+
+The **Soybean library** tab downloads selected public *genome assemblies* from the shared [SoyBase / Legume Information System datastore](https://www.legumeinfo.org/download/glycine/). The code repository does not contain the genomes. The catalog contains:
+
+| Species | Accession | Assembly | Catalog key | Compressed genome, approx. |
+| --- | --- | --- | --- | ---: |
+| *G. max* | Williams 82 | Wm82.gnm6.S97D | `wm82_v6` | 255 MB |
+| *G. max* | Williams 82 | Wm82.gnm2.DTC4 | `wm82_v2` | 287 MB |
+| *G. max* | Zhonghuang 13 | Zh13.gnm1.N6C8 | `zh13_v1` | 294 MB |
+| *G. soja* | W05 | W05.gnm1.SVL1 | `w05_v1` | 296 MB |
+| *G. soja* | PI 483463 | PI483463.gnm1.YJWS | `pi483463_v1` | 292 MB |
+| *G. soja* | PI 562565 (SoyW01) | PI_562565.gnm1.Z2VG | `soyw01_v1` | 261 MB |
+
+These are full genome assemblies, not the 1,110-accession variant pangenome or all assemblies available at SoyBase. Wm82 v2 and v6 are two assemblies of the same accession, not two biological accessions. W05 is a reference for that accession; it is not automatically the sequence of a different *G. soja* parent. Source URLs, assembly names and published checksums are recorded locally. Review the source collection pages for publication/citation and use conditions.
+
+### Set up from the desktop app
+
+1. Install **NCBI BLAST+**, including `makeblastdb`, `blastn` and `blastdbcmd`. You also need MAFFT to align extracted regions. Confirm they work at a terminal or enter full executable paths in the app. Primer3 is separate.
+2. Open **Soybean library**. The default library folder is `data/soybean/` in the cloned repository; choose another folder if preferred. By default Williams 82 v6 and W05 are highlighted. Use Ctrl/Shift (Command on some macOS configurations) to select the assemblies you want.
+3. Click **Download and build selected**. This performs a large download for each assembly, retrieves the source's MD5 checksum, verifies the compressed data, decompresses it, and creates a local nucleotide BLAST database. Watch the status at the bottom of the app. Downloads run one at a time and can take a while. Plan for several GB free per assembly for the compressed file, uncompressed genome and BLAST index, plus temporary working space.
+4. Wait until the assembly status shows **ready**. If the network, checksum or BLAST build fails, read the message and try again. Completed compressed downloads are reused after checksum verification; interrupted partial downloads are removed. If an old incomplete `blast` directory is reported, move that directory aside and rebuild. Do not delete a reference that another process is using.
+
+The `data/soybean/` default is in `.gitignore`, so the genomes and indexes will not be pushed to GitHub. If you choose another folder within the repository, add that path to `.gitignore` yourself. The files are not created until you explicitly download them. A source checksum verifies accidental transfer errors, not independent authenticity.
+
+### Start from the command line instead
+
+From the repository directory:
+
+```sh
+python -m primer_helper.soybean --list
+python -m primer_helper.soybean --install wm82_v6 w05_v1
+```
+
+Select any catalog keys shown by `--list`. For another storage location or a non-default executable, add `--directory /path/to/soybean_data` and/or `--makeblastdb /path/to/makeblastdb`. On Windows, use `py` if that is how Python is installed. Restart the app or use **Refresh status** after a command-line installation.
+
+### Search and extract candidate loci
+
+1. In **Soybean library**, select the **ready** assemblies you want to search. Paste one genomic query sequence, 30–50,000 bases, with or without a FASTA header. Query gaps are removed. For a target variant, a unique genomic region covering the locus with useful flanks is generally more informative than a short coding fragment; high-complexity 300–1,000 bp or longer can be a starting point, depending on the region.
+2. Click **Search locus in selected**. The app uses nucleotide `megablast` against each selected whole-genome database and displays individual local HSPs, their query and subject spans, percent identity, strand, and bit score. The search is limited to 30 subject sequences per database and up to three HSPs per subject; it is a candidate discovery tool, not an exhaustive paralogue screen or a whole-genome alignment.
+3. Inspect hits carefully using position, coverage, annotation and genomic context in SoyBase. Similarity or the top score does **not** establish orthology, and multiple rows can be different HSPs from the same locus. Select two or more hits; their displayed order determines the order in the next tab, with the first as reference. Choose extra flanking bases and click **Use selected hits for alignment**. The app extracts each displayed HSP's subject span plus flanks and orients it to the query. An HSP might cover only part of a gene or query, so select and review accordingly. Subject positions are 1-based inclusive, with flanks clipped to contig boundaries. IUPAC ambiguity codes other than `N` are converted to `N`; their count is recorded in each FASTA header.
+4. In **Sequences**, align the extracted regions with MAFFT, inspect the alignment, then **Find variants**. Verify both parental genotypes and binding sites using the actual parents; the downloaded genomes are reference samples.
+5. For primer specificity, paste or copy a candidate pair into **Specificity**, return to the library tab, select the ready assemblies and click **Search primers in selected**. Results are individual `blastn-short` binding hits for each assembly. Review pairing, orientation, product sizes and 3′ mismatches with an appropriate in-silico PCR method; a lack of hits is not proof of uniqueness. This is not an automated genome-wide primer-pair specificity assessment.
+
+No sequence or query is uploaded by the search: after initial downloads, genomic searches and extraction run locally. The app does not yet search by gene ID, download gene annotations, look up orthology groups, or automatically transfer coordinates across assemblies. Obtain a query region and its metadata from SoyBase or your own data, and review candidate hits before alignment.
+
+
 ## A first assay
 
 1. Identify the actual parental lines, locus, variant and intended readout. Obtain genomic sequences for orthologous regions with substantial flanking sequence. Confirm assembly/version, strand and coordinates. A public reference is a proxy unless it represents your actual parent.
@@ -81,7 +135,7 @@ python -m unittest discover -s tests -v
 python -m compileall -q app.py primer_helper tests
 ```
 
-The automated tests cover sequence parsing, variant positions, primer coordinates, KASP allele selection, plate order and reagent calculations. Tests use controlled Primer3 output rather than a real Primer3 installation. Actual MAFFT, Primer3, BLAST and graphical-desktop runs should be tested on the user's target machine with the installed versions and a small known reference before use.
+The automated tests cover local library setup with mocked downloads and BLAST, checksum handling, strand-aware sequence extraction, sequence parsing, variant positions, primer coordinates, KASP allele selection, plate order and reagent calculations. Tests use controlled tool output rather than real external installations. Actual MAFFT, Primer3, BLAST and graphical-desktop runs should be tested on the user's target machine with the installed versions and a small known reference before use.
 
 ## References
 

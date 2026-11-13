@@ -10,7 +10,7 @@ import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
-from primer_helper import core
+from primer_helper import core, soybean, dependencies
 
 class Application(tk.Tk):
     def __init__(self):
@@ -24,19 +24,21 @@ class Application(tk.Tk):
         style.configure('Title.TLabel',font=('Arial',19,'bold'),foreground='#173d3b')
         style.configure('Sub.TLabel',foreground='#425d5b')
         style.configure('Action.TButton',font=('Arial',10,'bold'))
-        self.fields={}; self.records=[]; self.variant_items=[]; self.designs=[]
+        self.fields={}; self.records=[]; self.variant_items=[]; self.designs=[]; self.library_hits=[]; self.library_busy=False; self.library_last_query=None; self.library_last_root=None
         self.var_status=tk.StringVar(value='Ready. Your sequences stay on this computer.')
         top=ttk.Frame(self,padding=(16,14,16,6)); top.pack(fill='x')
         ttk.Label(top,text='Primer Design Helper',style='Title.TLabel').pack(anchor='w')
         ttk.Label(top,text='From aligned parental sequences to assay design, plate planning and validation',style='Sub.TLabel').pack(anchor='w',pady=(4,0))
         bar=ttk.Frame(self,padding=(16,0));bar.pack(fill='x')
-        for label,callback in [('Open project',self.open_project),('Save project',self.save_project),('Load example',self.example)]:
+        for label,callback in [('Open project',self.open_project),('Save project',self.save_project),('Load example',self.example),('Soybean reference library',lambda:self.nb.select(self.library_tab)),('Software setup',lambda:self.nb.select(self.dependencies_tab))]:
             ttk.Button(bar,text=label,command=callback).pack(side='left',padx=(0,6))
         ttk.Label(bar,text='Local workspace • save a project to keep your work',style='Sub.TLabel').pack(side='right')
-        self.nb=ttk.Notebook(self);self.nb.pack(fill='both',expand=True,padx=16,pady=10)
-        self.make_sequences();self.make_design();self.make_specificity();self.make_bench();self.make_plate();self.make_validation();self.make_kasp()
         ttk.Label(self,textvariable=self.var_status,relief='sunken',anchor='w',padding=6).pack(fill='x',side='bottom')
+        self.nb=ttk.Notebook(self);self.nb.pack(fill='both',expand=True,padx=16,pady=10)
+        self.make_sequences();self.make_design();self.make_specificity();self.make_bench();self.make_plate();self.make_validation();self.make_kasp();self.make_library();self.make_dependencies()
+        self.use_managed_tools()
         self.example()
+        self.after(150,self.check_dependencies)
     def tab(self,name):
         frame=ttk.Frame(self.nb,padding=12);self.nb.add(frame,text=name);return frame
     def textfield(self,parent,key,height=8,wrap='none'):
@@ -54,8 +56,206 @@ class Application(tk.Tk):
     def header(self,parent,title,sub):
         ttk.Label(parent,text=title,font=('Arial',14,'bold')).pack(anchor='w')
         ttk.Label(parent,text=sub,wraplength=1060,justify='left').pack(anchor='w',pady=(2,8))
+    def make_dependencies(self):
+        import platform, shutil
+        f=self.tab('9  Software');self.dependencies_tab=f
+        self.header(f,'Software dependencies','Check the tools used by the app. You can select an existing executable or install missing tools into an isolated app-managed environment on Linux or macOS.')
+        cols=('tool','status','path','detail')
+        self.tools_table=ttk.Treeview(f,columns=cols,show='headings',selectmode='browse',height=5)
+        for col,title,width in [('tool','Executable',120),('status','Status',100),('path','Executable path',390),('detail','Check result',330)]:
+            self.tools_table.heading(col,text=title);self.tools_table.column(col,width=width,stretch=True)
+        self.tools_table.pack(fill='x',pady=(2,8))
+        for name in dependencies.TOOL_NAMES:self.tools_table.insert('','end',iid=name,values=(name,'not checked','',''))
+        row=ttk.Frame(f);row.pack(fill='x')
+        ttk.Button(row,text='Check software',command=self.check_dependencies).pack(side='left')
+        ttk.Button(row,text='Browse for selected executable',command=self.browse_dependency).pack(side='left',padx=6)
+        ttk.Label(f,text='MAFFT aligns sequences. Primer3 proposes primers. BLAST+ includes blastn, makeblastdb and blastdbcmd; all three are required for the soybean library.',wraplength=1050).pack(anchor='w',pady=8)
+        ttk.Separator(f).pack(fill='x',pady=4)
+        ttk.Label(f,text='Install missing software',font=('Arial',12,'bold')).pack(anchor='w',pady=(4,3))
+        ttk.Label(f,text='Linux/macOS: use an installed Conda or Mamba to install missing packages from conda-forge/Bioconda into this app’s own folder. This uses network access and disk space; it does not modify the base Conda environment.',wraplength=1050).pack(anchor='w')
+        row=ttk.Frame(f);row.pack(fill='x',pady=6)
+        self.conda_path=tk.StringVar(value=shutil.which('conda') or shutil.which('mamba') or 'conda')
+        ttk.Label(row,text='Conda or Mamba').pack(side='left');ttk.Entry(row,textvariable=self.conda_path,width=50).pack(side='left',padx=6)
+        ttk.Button(row,text='Browse',command=self.browse_conda).pack(side='left');ttk.Button(row,text='Install missing tools',command=self.install_dependencies,style='Action.TButton').pack(side='left',padx=8)
+        ttk.Label(f,text='App environment: '+str(dependencies.DEFAULT_PREFIX),wraplength=1050).pack(anchor='w')
+        ttk.Label(f,text='Native Windows: Bioconda does not provide Windows packages. Use the official links below, install each Windows-compatible release where available, then browse for its executable. You can also run the full application inside Linux/WSL.',wraplength=1050).pack(anchor='w',pady=(10,6))
+        row=ttk.Frame(f);row.pack(fill='x')
+        for label,url in dependencies.OFFICIAL_LINKS.items():
+            ttk.Button(row,text=label+' downloads',command=lambda u=url:__import__('webbrowser').open(u)).pack(side='left',padx=(0,6))
+        ttk.Label(f,text='A tool check tests whether a program responds; it does not validate scientific results. If an installer is unavailable on your platform, use the official project instructions and browse for the installed executable.',wraplength=1050).pack(anchor='w',pady=12)
+    def tool_vars(self):
+        return {'mafft':self.mafft,'primer3_core':self.p3path,'blastn':self.blastpath,'makeblastdb':self.makeblastdb_path,'blastdbcmd':self.blastdbcmd_path}
+    def use_managed_tools(self):
+        for name,path in dependencies.managed_paths(dependencies.DEFAULT_PREFIX).items():
+            var=self.tool_vars()[name]
+            if var.get()==name and Path(path).is_file():var.set(path)
+    def check_dependencies(self):
+        snapshots={name:var.get() for name,var in self.tool_vars().items()}
+        def done(statuses):
+            for status in statuses:
+                if self.tool_vars()[status.name].get()!=snapshots[status.name]:continue
+                self.tools_table.item(status.name,values=(status.name,'ready' if status.usable else 'missing or failed',status.path or status.requested,status.detail))
+            missing=[x.name for x in statuses if not x.usable]
+            self.var_status.set('Software ready.' if not missing else 'Software check: missing or failed: '+', '.join(missing))
+        self.library_work(lambda log:[dependencies.probe(name,path) for name,path in snapshots.items()],done)
+    def browse_dependency(self):
+        selected=self.tools_table.selection()
+        if not selected:messagebox.showinfo('Choose software','Select an executable in the software table first.');return
+        path=filedialog.askopenfilename(title='Choose '+selected[0]+' executable')
+        if path:self.tool_vars()[selected[0]].set(path);self.check_dependencies()
+    def browse_conda(self):
+        path=filedialog.askopenfilename(title='Choose conda or mamba executable')
+        if path:self.conda_path.set(path)
+    def install_dependencies(self):
+        snapshots={name:var.get() for name,var in self.tool_vars().items()};manager=self.conda_path.get()
+        if not messagebox.askyesno('Install missing software?', 'Install missing MAFFT, Primer3 and BLAST+ tools using Conda/Bioconda into the app’s separate data/tools folder? This downloads software and uses local disk space.'):return
+        def work(log):
+            statuses=[dependencies.probe(name,path) for name,path in snapshots.items()]
+            return dependencies.install_missing(statuses,manager,dependencies.DEFAULT_PREFIX,log)
+        def done(found):
+            for name,path in found.items():
+                if self.tool_vars()[name].get()==snapshots[name]:self.tool_vars()[name].set(path)
+            if found:self.var_status.set('Installed tools and updated their app paths. Click Check software to review.')
+            else:self.var_status.set('All requested software is already available.')
+            self.after(100,self.check_dependencies)
+        self.library_work(work,done)
+    def make_library(self):
+        f=self.tab('8  Soybean library');self.library_tab=f
+        self.header(f,'Soybean reference library','Download selected public assemblies and build local BLAST databases. Search a locus sequence, review candidate genomic hits, then send selected regions to the sequence alignment tab.')
+        row=ttk.Frame(f);row.pack(fill='x')
+        self.library_root=tk.StringVar(value=str(soybean.DEFAULT_ROOT));self.makeblastdb_path=tk.StringVar(value='makeblastdb');self.blastdbcmd_path=tk.StringVar(value='blastdbcmd')
+        ttk.Label(row,text='Library folder').pack(side='left');ttk.Entry(row,textvariable=self.library_root).pack(side='left',fill='x',expand=True,padx=5)
+        ttk.Button(row,text='Browse',command=self.choose_library).pack(side='left')
+        row=ttk.Frame(f);row.pack(fill='x',pady=(4,3));ttk.Label(row,text='makeblastdb').pack(side='left');ttk.Entry(row,textvariable=self.makeblastdb_path,width=22).pack(side='left',padx=5)
+        ttk.Label(row,text='blastdbcmd').pack(side='left',padx=(12,0));ttk.Entry(row,textvariable=self.blastdbcmd_path,width=22).pack(side='left',padx=5)
+        ttk.Button(row,text='Refresh status',command=self.refresh_library).pack(side='left',padx=7)
+        cols=('species','accession','assembly','size','status')
+        self.library_table=ttk.Treeview(f,columns=cols,show='headings',selectmode='extended',height=6)
+        for col,title,width in [('species','Species',85),('accession','Accession',180),('assembly','Assembly',175),('size','Download ~MB',100),('status','Local status',170)]:
+            self.library_table.heading(col,text=title);self.library_table.column(col,width=width,stretch=True)
+        self.library_table.pack(fill='x',pady=3)
+        for ref in soybean.REFERENCES:self.library_table.insert('', 'end',iid=ref.key,values=(f'G. {ref.species}',ref.accession,ref.assembly,ref.approx_mb,'not installed'))
+        self.library_table.selection_set(('wm82_v6','w05_v1'));self.refresh_library()
+        row=ttk.Frame(f);row.pack(fill='x',pady=3)
+        ttk.Button(row,text='Download and build selected',command=self.setup_library,style='Action.TButton').pack(side='left')
+        ttk.Button(row,text='Search locus in selected',command=self.search_library).pack(side='left',padx=6)
+        ttk.Button(row,text='Search primers in selected',command=self.library_primer_search).pack(side='left')
+        ttk.Label(f,text='Each genome needs roughly 0.25–0.30 GB to download and several GB on disk after unpacking and indexing. Ctrl/Shift selects multiple rows. Wm82 v2/v6 are assembly versions of the same accession.',wraplength=1050).pack(anchor='w')
+        ttk.Label(f,text='Locus query — one genomic sequence, 30–50,000 bases (FASTA or plain)').pack(anchor='w',pady=(5,0))
+        self.textfield(f,'library_query',height=2,wrap='word')
+        row=ttk.Frame(f);row.pack(fill='x');self.library_flank=tk.StringVar(value='500')
+        ttk.Label(row,text='Extra genomic flank (bp)').pack(side='left');ttk.Entry(row,textvariable=self.library_flank,width=8).pack(side='left',padx=5)
+        ttk.Button(row,text='Use selected hits for alignment',command=self.use_library_hits).pack(side='left',padx=8)
+        ttk.Label(row,text='Selection order follows displayed rows; first becomes reference.').pack(side='left')
+        cols=('assembly','subject','identity','query','position','strand','score')
+        hit_frame=ttk.Frame(f)
+        self.hits_table=ttk.Treeview(hit_frame,columns=cols,show='headings',selectmode='extended',height=3)
+        for col,title,width in [('assembly','Assembly',110),('subject','Contig',210),('identity','Identity %',75),('query','Query span',95),('position','Subject span',145),('strand','Strand',60),('score','Bit score',75)]:
+            self.hits_table.heading(col,text=title);self.hits_table.column(col,width=width,stretch=True)
+        ttk.Label(f,text='Hits are candidates, not verified orthologues. Review coverage, locus, genomic context and paralogues before selecting; a single HSP may cover only part of your query.',wraplength=1050).pack(anchor='w')
+        hit_frame.pack(fill='both',expand=True,pady=3)
+        hit_scroll=ttk.Scrollbar(hit_frame,orient='vertical',command=self.hits_table.yview)
+        self.hits_table.configure(yscrollcommand=hit_scroll.set);hit_scroll.pack(side='right',fill='y');self.hits_table.pack(fill='both',expand=True)
+    def choose_library(self):
+        path=filedialog.askdirectory(initialdir=self.library_root.get() if Path(self.library_root.get()).exists() else None)
+        if path:self.library_root.set(path);self.refresh_library()
+    def selected_references(self):
+        selected=set(self.library_table.selection())
+        refs=[ref for ref in soybean.REFERENCES if ref.key in selected]
+        if not refs:raise core.InputError('Select one or more reference rows in the soybean library.')
+        return refs
+    def refresh_library(self):
+        for ref in soybean.REFERENCES:
+            status='not installed'
+            folder=soybean.reference_dir(Path(self.library_root.get()),ref)
+            if (folder/'reference.json').exists():status='downloaded; needs BLAST index'
+            try:soybean.database_prefix(Path(self.library_root.get()),ref);status='ready'
+            except core.InputError:pass
+            self.library_table.item(ref.key,values=(f'G. {ref.species}',ref.accession,ref.assembly,ref.approx_mb,status))
+    def library_work(self,work,finish):
+        if self.library_busy:messagebox.showinfo('Soybean library','A library operation is already running.');return
+        self.library_busy=True;self.var_status.set('Working on soybean library…')
+        def progress(msg):self.after(0,lambda:self.var_status.set(msg))
+        def worker():
+            try:
+                result=work(progress)
+                def success():
+                    self.library_busy=False;self.refresh_library();finish(result)
+                self.after(0,success)
+            except Exception as exc:
+                msg=str(exc)
+                def failure():
+                    self.library_busy=False;self.refresh_library();self.var_status.set('Soybean library operation failed.');messagebox.showerror('Soybean library',msg)
+                self.after(0,failure)
+        threading.Thread(target=worker,daemon=True).start()
+    def setup_library(self):
+        def start():
+            refs=self.selected_references();root=Path(self.library_root.get()).expanduser();exe=self.makeblastdb_path.get().strip()
+            if not exe:raise core.InputError('Enter the makeblastdb executable.')
+            if not __import__('shutil').which(exe):raise core.InputError('Cannot find makeblastdb. Install NCBI BLAST+ or enter its full path.')
+            def work(progress):
+                for ref in refs:soybean.download_and_prepare(ref,root,progress);soybean.build_database(ref,root,exe,progress)
+            def done(_):self.var_status.set('Selected soybean references are ready for local search.')
+            self.library_work(work,done)
+        self.guard(start)
+    def search_library(self):
+        def start():
+            refs=self.selected_references();root=Path(self.library_root.get()).expanduser();query=self.value('library_query');exe=self.blastpath.get().strip()
+            soybean.normalize_query(query)
+            def done(hits):
+                if self.value('library_query')!=query or Path(self.library_root.get()).expanduser()!=root:
+                    self.var_status.set('Search results discarded because the query or library folder changed.');return
+                self.library_hits=hits;self.library_last_query=query;self.library_last_root=root
+                for item in self.hits_table.get_children():self.hits_table.delete(item)
+                for i,h in enumerate(hits):
+                    ref=soybean.BY_KEY[h.reference_key]
+                    self.hits_table.insert('','end',iid=str(i),values=(ref.assembly,h.subject,f'{h.identity:.1f}',f'{h.query_start}–{h.query_end}',f'{h.subject_start}–{h.subject_end}',h.strand,f'{h.bitscore:.1f}'))
+                self.var_status.set(f'{len(hits)} candidate hits. Inspect before selecting orthologous regions.')
+            self.library_work(lambda log:soybean.find_hits(root,refs,query,exe,progress=log),done)
+        self.guard(start)
+    def use_library_hits(self):
+        def start():
+            selection=set(self.hits_table.selection())
+            indices=[int(i) for i in self.hits_table.get_children() if i in selection]
+            if len(indices)<2:raise core.InputError('Select at least two candidate hits for alignment.')
+            hits=[self.library_hits[i] for i in indices];root=Path(self.library_root.get()).expanduser();flank=int(self.library_flank.get());exe=self.blastdbcmd_path.get().strip()
+            if self.library_last_query!=self.value('library_query') or self.library_last_root!=root:
+                raise core.InputError('The query or library folder has changed since these hits were found. Search again.')
+            before=self.value('sequences')
+            if not messagebox.askyesno('Replace sequence input?','The selected regions will replace the current sequence input. Save the project first if you need the existing input. Continue?'):return
+            def work(log):
+                results=[]
+                for i,hit in enumerate(hits, start=1):
+                    log(f'Extracting {soybean.BY_KEY[hit.reference_key].assembly} {hit.subject}…')
+                    name,seq=soybean.extract_hit(root,hit,flank,exe)
+                    results.append((f'{name}|hit={i}',seq))
+                return results
+            def done(records):
+                if self.value('sequences')!=before:
+                    self.var_status.set('Extraction discarded because the sequence input changed.');return
+                self.put('sequences',core.fasta(records));self.invalidate_sequences();self.nb.select(0)
+                self.var_status.set('Regions loaded in display order. Align with MAFFT; inspect orthology and N bases.')
+            self.library_work(work,done)
+        self.guard(start)
+    def library_primer_search(self):
+        def start():
+            refs=self.selected_references();root=Path(self.library_root.get()).expanduser();seq=self.value('primers').splitlines();exe=self.blastpath.get().strip()
+            if len(seq)!=2:raise core.InputError('Enter a forward and reverse primer in the Specificity tab first.')
+            fw,rv=(s.strip().upper() for s in seq)
+            def work(log):
+                result=[]
+                for ref in refs:
+                    log(f'Searching primers in {ref.assembly}…')
+                    db=soybean.database_prefix(root,ref)
+                    result.append(f'# {ref.species} {ref.accession} {ref.assembly}\n'+core.blast_primers(fw,rv,str(db),exe))
+                return '\n'.join(result)
+            def done(output):
+                self.put('blast_output','query\tsubject\tidentity%\tlength\tmismatches\tgaps\tqstart\tqend\tsstart\tsend\tevalue\tbitscore\tquery_seq\tsubject_seq\n'+output)
+                self.nb.select(2);self.var_status.set('Primer hits reported by reference. Inspect paired sites and 3′ mismatches.')
+            self.library_work(work,done)
+        self.guard(start)
     def make_sequences(self):
-        f=self.tab('1  Sequences & variants')
+        f=self.tab('1  Sequences')
         self.header(f,'Compare the parental region','Paste genomic FASTA with two or more sequences. The first is the reference and the second is the comparison. Supply orthologous loci in the same orientation. The example is already aligned.')
         controls=ttk.Frame(f);controls.pack(fill='x')
         ttk.Button(controls,text='Open FASTA',command=self.open_fasta).pack(side='left',padx=(0,6))
@@ -67,7 +267,7 @@ class Application(tk.Tk):
         self.variant_list=tk.Listbox(f,height=8,exportselection=False,font=('Consolas',10));self.variant_list.pack(fill='both',expand=True,pady=5)
         ttk.Label(f,text='Already aligned? Select Find variants directly. For realignment, existing - gaps are removed first and may be placed differently; N (unknown bases) is retained. Inspect alignments and verify orthology.',wraplength=1050).pack(anchor='w')
     def make_design(self):
-        f=self.tab('2  Primer3 design')
+        f=self.tab('2  Primer3')
         self.header(f,'Design shared flanking primers','Select a variant in the first tab, then run Primer3 locally. The app checks each returned binding site across every aligned input sequence; it does not establish genome-wide specificity.')
         row=ttk.Frame(f);row.pack(fill='x')
         self.p3path=tk.StringVar(value='primer3_core');self.minlen=tk.StringVar(value='100');self.maxlen=tk.StringVar(value='400');self.npairs=tk.StringVar(value='5')
@@ -79,7 +279,7 @@ class Application(tk.Tk):
         ttk.Button(row,text='Use pair for specificity tab',command=self.copy_pair).pack(side='left',padx=5)
         ttk.Label(f,text='For a SNP, a common pair alone does not genotype the variant. For KASP, use the separate KASP planning notes on the validation tab.',wraplength=1050).pack(anchor='w',pady=7)
     def make_kasp(self):
-        f=self.tab('7  KASP candidates')
+        f=self.tab('7  KASP')
         self.header(f,'Propose allele-specific SNP primers','Select a SNP on the first tab. This experimental path proposes two forward target-binding segments with the SNP at the 3′ end and uses Primer3 for a common reverse primer. Evaluate every candidate before ordering.')
         row=ttk.Frame(f);row.pack(fill='x')
         self.kasp_length=tk.StringVar(value='20')
@@ -133,7 +333,7 @@ class Application(tk.Tk):
         ttk.Label(f,text='BLAST hits (tab separated)').pack(anchor='w',pady=(8,0));self.textfield(f,'blast_output',height=16)
         ttk.Label(f,text='Results depend on database completeness and search settings. Short-primer BLAST can miss sites; examine 3′ mismatches and paired products, and verify experimentally. Consider both parental assemblies and paralogues.',wraplength=1050).pack(anchor='w')
     def make_bench(self):
-        f=self.tab('4  Mix calculator');self.header(f,'Primer stocks and reaction master mix','Use the actual oligo yield and reagent concentrations. These calculations do not choose polymerase conditions for you.')
+        f=self.tab('4  Mix');self.header(f,'Primer stocks and reaction master mix','Use the actual oligo yield and reagent concentrations. These calculations do not choose polymerase conditions for you.')
         grid=ttk.Frame(f);grid.pack(fill='x')
         self.calcvars={}
         values=[('oligo_nmol','Delivered oligo (nmol)','9'),('stock_um','Resuspension target (µM)','100'),('work_um','Working concentration (µM)','10'),('work_vol','Working volume (µL)','100'),('total','Reaction volume (µL)','25'),('strength','Master mix strength (×)','2'),('fstock','Forward primer stock (µM)','10'),('rstock','Reverse primer stock (µM)','10'),('final','Final each primer (µM)','0.2'),('template','DNA per well (µL)','2'),('wells','Number of wells','96'),('overage','Overage (%)','10')]
@@ -145,12 +345,12 @@ class Application(tk.Tk):
         self.textfield(f,'mix_output',height=12,wrap='word')
         ttk.Label(f,text='This calculator is for a conventional two-primer reaction. KASP assay mixes have different chemistry and ratios; use the KASP instructions in the validation tab.',wraplength=1050).pack(anchor='w')
     def make_plate(self):
-        f=self.tab('5  Plate planner');self.header(f,'Prepare a 96-well sample map','Enter one unique well label per line, in loading order. Wells fill down columns: A1, B1 … H1, A2. Explicitly include parents, true heterozygote when available, extraction blank and at least two NTCs.')
+        f=self.tab('5  Plate');self.header(f,'Prepare a 96-well sample map','Enter one unique well label per line, in loading order. Wells fill down columns: A1, B1 … H1, A2. Explicitly include parents, true heterozygote when available, extraction blank and at least two NTCs.')
         ttk.Label(f,text='Sample and control labels').pack(anchor='w');self.textfield(f,'samples',height=10)
         row=ttk.Frame(f);row.pack(fill='x');ttk.Button(row,text='Preview plate',command=self.make_plate_map).pack(side='left');ttk.Button(row,text='Export CSV',command=self.export_plate).pack(side='left',padx=6)
         self.textfield(f,'plate_output',height=10)
     def make_validation(self):
-        f=self.tab('6  Validate & record');self.header(f,'Validation, KASP and experimental notes','Document what was actually tested. Keep uncertain wells as no calls; no software result proves biological specificity.')
+        f=self.tab('6  Validation');self.header(f,'Validation, KASP and experimental notes','Document what was actually tested. Keep uncertain wells as no calls; no software result proves biological specificity.')
         self.textfield(f,'notes',height=18,wrap='word')
         ttk.Button(f,text='Insert assay guidance',command=self.insert_guidance).pack(anchor='w')
     def open_fasta(self):
@@ -254,7 +454,7 @@ class Application(tk.Tk):
     def save_project(self):
         path=filedialog.asksaveasfilename(defaultextension='.json',initialfile='primer_project.json',filetypes=[('Project JSON','*.json')])
         if not path:return
-        data={'format':'primer-design-helper','version':1,'fields':{k:self.value(k) for k in self.fields},'settings':{'mafft':self.mafft.get(),'primer3':self.p3path.get(),'blastn':self.blastpath.get(),'db':self.dbpath.get(),'min':self.minlen.get(),'max':self.maxlen.get(),'pairs':self.npairs.get(),'calc':{k:v.get() for k,v in self.calcvars.items()}}}
+        data={'format':'primer-design-helper','version':1,'fields':{k:self.value(k) for k in self.fields},'settings':{'mafft':self.mafft.get(),'primer3':self.p3path.get(),'blastn':self.blastpath.get(),'db':self.dbpath.get(),'min':self.minlen.get(),'max':self.maxlen.get(),'pairs':self.npairs.get(),'conda_path':self.conda_path.get(),'library_root':self.library_root.get(),'makeblastdb':self.makeblastdb_path.get(),'blastdbcmd':self.blastdbcmd_path.get(),'calc':{k:v.get() for k,v in self.calcvars.items()}}}
         try:Path(path).write_text(json.dumps(data,indent=2),encoding='utf-8');self.var_status.set('Project saved locally.')
         except OSError as e:messagebox.showerror('Save project',str(e))
     def open_project(self):
@@ -267,11 +467,11 @@ class Application(tk.Tk):
             for k,v in data.get('fields',{}).items():
                 if k in self.fields and isinstance(v,str):self.put(k,v)
             settings=data.get('settings',{})
-            for key,var in [('mafft',self.mafft),('primer3',self.p3path),('blastn',self.blastpath),('db',self.dbpath),('min',self.minlen),('max',self.maxlen),('pairs',self.npairs)]:
+            for key,var in [('mafft',self.mafft),('primer3',self.p3path),('blastn',self.blastpath),('db',self.dbpath),('min',self.minlen),('max',self.maxlen),('pairs',self.npairs),('conda_path',self.conda_path),('library_root',self.library_root),('makeblastdb',self.makeblastdb_path),('blastdbcmd',self.blastdbcmd_path)]:
                 if key in settings:var.set(settings[key])
             for k,v in settings.get('calc',{}).items():
                 if k in self.calcvars:self.calcvars[k].set(v)
-            self.var_status.set('Project loaded. Find variants again to reconstruct selections; rerun Primer3 to select a candidate.')
+            self.refresh_library();self.var_status.set('Project loaded. Find variants again to reconstruct selections; rerun Primer3 to select a candidate.')
         self.guard(run)
     def example(self):
         rng=random.Random(21);ref=''.join(rng.choice('ACGT') for _ in range(450));alt=ref[:180]+('A' if ref[180]!='A' else 'G')+ref[181:]
