@@ -15,7 +15,7 @@ from itertools import zip_longest
 class InputError(ValueError):
     pass
 
-def parse_fasta(text: str, *, aligned: bool = False) -> list[tuple[str, str]]:
+def parse_fasta(text: str, *, aligned: bool = False, allow_gaps: bool = False) -> list[tuple[str, str]]:
     records = []
     name = None
     chunks = []
@@ -39,10 +39,10 @@ def parse_fasta(text: str, *, aligned: bool = False) -> list[tuple[str, str]]:
         raise InputError('Provide at least two FASTA records.')
     if len({n for n, _ in records}) != len(records):
         raise InputError('FASTA names must be unique.')
-    allowed = set('ACGTN-') if aligned else set('ACGTN')
+    allowed = set('ACGTN-') if aligned or allow_gaps else set('ACGTN')
     for name, seq in records:
         if not seq or not set(seq) <= allowed:
-            raise InputError(f'{name}: use only A, C, G, T, N' + (' and gaps (-).' if aligned else '.'))
+            raise InputError(f'{name}: use only A, C, G, T, N' + (' and gaps (-).' if aligned or allow_gaps else '.'))
     if aligned and len({len(seq) for _, seq in records}) != 1:
         raise InputError('Aligned FASTA sequences must all have the same length.')
     return records
@@ -64,14 +64,22 @@ def run_tool(command: list[str], *, input_text: str = '', timeout: int = 120) ->
     return proc.stdout
 
 def mafft_align(text: str, executable: str = 'mafft') -> str:
-    records = parse_fasta(text)
-    result = run_tool([executable, '--auto', '-'], input_text=fasta(records), timeout=300)
+    # This is a fresh alignment, not a profile-preserving MAFFT mode.
+    # Remove alignment gaps while preserving unknown bases (N). Input sequences
+    # may be pre-aligned or of different lengths.
+    records = parse_fasta(text, allow_gaps=True)
+    ungapped = [(name, seq.replace('-', '')) for name, seq in records]
+    if any(not seq for _, seq in ungapped):
+        raise InputError('Each sequence must contain at least one nucleotide, not only gaps.')
+    result = run_tool([executable, '--auto', '-'], input_text=fasta(ungapped), timeout=300)
     aligned = parse_fasta(result, aligned=True)
     # MAFFT normally keeps sequence order, but explicitly restore it by unique names.
     by_name = dict(aligned)
-    if set(by_name) != {name for name, _ in records}:
+    if set(by_name) != {name for name, _ in ungapped}:
         raise InputError('MAFFT output names do not match the input names.')
-    return fasta([(name, by_name[name]) for name, _ in records])
+    if any(by_name[name].replace('-', '') != seq for name, seq in ungapped):
+        raise InputError('MAFFT output sequences do not match the input nucleotides.')
+    return fasta([(name, by_name[name]) for name, _ in ungapped])
 
 @dataclass(frozen=True)
 class Variant:

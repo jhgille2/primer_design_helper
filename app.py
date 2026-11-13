@@ -56,16 +56,16 @@ class Application(tk.Tk):
         ttk.Label(parent,text=sub,wraplength=1060,justify='left').pack(anchor='w',pady=(2,8))
     def make_sequences(self):
         f=self.tab('1  Sequences & variants')
-        self.header(f,'Compare the parental region','Paste genomic FASTA with two or more sequences. The first sequence is the reference; the second is the comparison. Supply orthologous loci in the same orientation.')
+        self.header(f,'Compare the parental region','Paste genomic FASTA with two or more sequences. The first is the reference and the second is the comparison. Supply orthologous loci in the same orientation. The example is already aligned.')
         controls=ttk.Frame(f);controls.pack(fill='x')
         ttk.Button(controls,text='Open FASTA',command=self.open_fasta).pack(side='left',padx=(0,6))
-        ttk.Button(controls,text='Align with MAFFT',command=self.align).pack(side='left',padx=6)
+        ttk.Button(controls,text='Align or realign with MAFFT',command=self.align).pack(side='left',padx=6)
         ttk.Button(controls,text='Find variants in aligned FASTA',command=self.find_variants).pack(side='left',padx=6)
         ttk.Label(controls,text='MAFFT executable').pack(side='left',padx=(16,4));self.mafft=tk.StringVar(value='mafft');ttk.Entry(controls,textvariable=self.mafft,width=16).pack(side='left')
-        ttk.Label(f,text='FASTA input or aligned FASTA').pack(anchor='w',pady=(8,0));self.textfield(f,'sequences',height=9)
+        ttk.Label(f,text='FASTA input or aligned FASTA (MAFFT realignment removes existing gaps before aligning)' ).pack(anchor='w',pady=(8,0));self.textfield(f,'sequences',height=9)
         ttk.Label(f,text='Select a variant for primer design (coordinates refer to the alignment and first record)').pack(anchor='w')
         self.variant_list=tk.Listbox(f,height=8,exportselection=False,font=('Consolas',10));self.variant_list.pack(fill='both',expand=True,pady=5)
-        ttk.Label(f,text='Inspect the alignment: N bases and reference gaps are uncertain; automated differences do not establish orthology.',wraplength=1050).pack(anchor='w')
+        ttk.Label(f,text='Already aligned? Select Find variants directly. For realignment, existing - gaps are removed first and may be placed differently; N (unknown bases) is retained. Inspect alignments and verify orthology.',wraplength=1050).pack(anchor='w')
     def make_design(self):
         f=self.tab('2  Primer3 design')
         self.header(f,'Design shared flanking primers','Select a variant in the first tab, then run Primer3 locally. The app checks each returned binding site across every aligned input sequence; it does not establish genome-wide specificity.')
@@ -177,7 +177,7 @@ class Application(tk.Tk):
             # Do not overwrite input if the user changed it while MAFFT was running.
             if self.value('sequences') != inp:
                 self.var_status.set('Alignment discarded because input changed while MAFFT was running.');return
-            self.put('sequences',result);self.invalidate_sequences();self.find_variants();self.var_status.set('MAFFT alignment completed. Inspect orthology and orientation.')
+            self.put('sequences',result);self.invalidate_sequences();self.find_variants();self.var_status.set('MAFFT realignment completed; existing gaps were reset. Inspect orthology and orientation.')
         self.background(lambda:core.mafft_align(inp,exe),done)
     def find_variants(self):
         def run():

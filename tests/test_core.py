@@ -17,6 +17,26 @@ class FastaVariants(unittest.TestCase):
         self.assertTrue(checked[0]['match']);self.assertFalse(checked[1]['match'])
     def test_reverse_complement(self): self.assertEqual(core.revcomp('ACGTTA'),'TAACGT')
 
+class MafftInput(unittest.TestCase):
+    @patch('primer_helper.core.run_tool')
+    def test_realigns_gapped_input_and_keeps_unknowns(self, run):
+        run.return_value='>alt\nAATC-GNT\n>ref\nAAC--GNT\n'
+        result=core.mafft_align('>ref\nAAC--GNT\n>alt\nAATC-GNT\n')
+        self.assertEqual(run.call_args.kwargs['input_text'], '>ref\nAACGNT\n>alt\nAATCGNT\n')
+        self.assertEqual(result, '>ref\nAAC--GNT\n>alt\nAATC-GNT\n')
+    @patch('primer_helper.core.run_tool')
+    def test_unaligned_sequences_may_have_different_lengths(self, run):
+        run.return_value='>a\nAC-GT\n>b\nACNGT\n'
+        self.assertEqual(core.mafft_align('>a\nACGT\n>b\nACNGT\n'),run.return_value)
+    @patch('primer_helper.core.run_tool')
+    def test_rejects_sequence_of_only_gaps(self, run):
+        with self.assertRaises(core.InputError): core.mafft_align('>a\n----\n>b\nACGT\n')
+        run.assert_not_called()
+    @patch('primer_helper.core.run_tool')
+    def test_rejects_altered_alignment_bases(self, run):
+        run.return_value='>a\nACGT\n>b\nACGT\n'
+        with self.assertRaises(core.InputError):core.mafft_align('>a\nACGT\n>b\nACGA\n')
+
 class Design(unittest.TestCase):
     def setUp(self):
         self.ref='A'*70;self.alt='A'*30+'G'+'A'*39
